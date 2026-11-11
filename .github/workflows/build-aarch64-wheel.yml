@@ -1,0 +1,34 @@
+name: Build MediaPipe aarch64 Wheel
+
+on:
+  workflow_dispatch:   # 仅手动触发，避免推送代码时自动运行
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm   # 原生 ARM64 runner
+    timeout-minutes: 480        # 8 小时超时，防止意外挂起消耗额度
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build aarch64 wheel with Docker
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            -f Dockerfile.manylinux2014_aarch64rp4 \
+            -t mp_manylinux_aarch64rp4 .
+
+      - name: Extract wheel from image
+        run: |
+          docker create -ti --name mp_wheel_container mp_manylinux_aarch64rp4:latest
+          mkdir -p wheelhouse_aarch64
+          docker cp mp_wheel_container:/wheelhouse/. wheelhouse_aarch64/
+          docker rm -f mp_wheel_container
+          ls -lh wheelhouse_aarch64/
+
+      - name: Upload wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mediapipe-aarch64-wheel
+          path: wheelhouse_aarch64/*.whl
+          if-no-files-found: error
